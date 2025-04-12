@@ -41,12 +41,10 @@ defmodule Exoffice.Parser.Excel2003.Loader do
             document_summary_information: nil,
             sst_tid: nil
 
-  def load(path, sheet \\ nil) do
-    with {:ok, file} <- File.open(path, [:read, :binary]),
-         {:ok, ole} <- :file.read(file, 8),
+  def load(data, sheet \\ nil) do
+    with <<ole::binary-8, _rest::binary>> <- data,
          true <- ole == OLE.identifier_ole(),
-         {:ok, binary} <- File.read(path),
-         {:ok, ole} <- OLE.parse_blocks(binary),
+         {:ok, ole} <- OLE.parse_blocks(data),
          loader <- get_stream(ole),
          {stream, _pos, excel} <- parse(loader, 0, %Excel2003{data_size: byte_size(loader.data)}),
          pids = parse_sheets(loader, excel, sheet) do
@@ -640,7 +638,7 @@ defmodule Exoffice.Parser.Excel2003.Loader do
           true ->
             # list of formatting runs
             fmt_runs =
-              Enum.reduce(0..(formatting_runs - 1), [], fn i, acc ->
+              Enum.reduce(0..(formatting_runs - 1), fn i, acc ->
                 # first formatted character; zero-based
                 char_pos = OLE.get_int_2d(record_data, pos + i * 4)
 

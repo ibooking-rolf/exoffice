@@ -12,8 +12,8 @@ defmodule Exoffice.Parser.Excel2007 do
   true
 
   """
-  def parse(path, options \\ []) do
-    multi_extract(path, nil, options)
+  def parse(path, _options \\ []) do
+    Xlsxir.multi_extract(path)
   end
 
   @doc """
@@ -25,8 +25,8 @@ defmodule Exoffice.Parser.Excel2007 do
   true
 
   """
-  def parse_sheet(path, index, options \\ []) do
-    multi_extract(path, index, options)
+  def parse_sheet(path, index, _options \\ []) do
+    Xlsxir.multi_extract(path, index, false)
   end
 
   @doc """
@@ -78,10 +78,5 @@ defmodule Exoffice.Parser.Excel2007 do
   """
   def close(pid) do
     Xlsxir.close(pid)
-  end
-
-  defp multi_extract(path, index, options) do
-    # Use default values of Xlsxir for timer and excel params
-    Xlsxir.multi_extract(path, index, false, nil, options)
   end
 end

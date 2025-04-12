@@ -13,10 +13,7 @@ defmodule Exoffice do
   {:ok, pid, parser} or {:error, reason}
   ## Parameters
   - `path` - file path of a file (".xls", ".xlsx" or ".csv" file) as a string
-  - `options` - keyword list of options:
-    - `sheet` - index of worksheet to parse (optional). By default all sheets will be parsed
-    - `parsers` - extra parsers to use (optional). It will be added to the configuration parsers and the default parsers.
-    - `parser_options` - options for the parser (optional)
+  - `sheet` - index of worksheet to parse (optional). By default all sheets will be parsed
 
   ## Example
   Parse all worksheets in different files:
@@ -32,28 +29,38 @@ defmodule Exoffice do
       iex> [{:ok, pid, _}] = Exoffice.parse("./test/test_data/test.csv")
       iex> is_pid(pid)
       true
-  """
-  def parse(path, options \\ []) do
-    options = fix_options(options)
-    sheet = options[:sheet]
-    parser_options = options[:parser_options] || []
 
+  """
+  def parse(path, sheet \\ nil, overrides \\ []) do
     config = Application.get_env(:exoffice, __MODULE__, [])
 
-    options_parsers = options[:parsers] || []
-    config_parsers = config[:parsers] || []
+    parsers =
+      case config[:parsers] do
+        nil -> []
+        parsers -> parsers
+      end
 
-    parsers = options_parsers ++ config_parsers ++ @default_parsers
+    parsers = parsers ++ @default_parsers
     extension = Path.extname(path)
 
-    parser = find_parser(parsers, extension)
+    parser =
+      Enum.reduce_while(parsers, nil, fn parser, acc ->
+        if Enum.member?(parser.extensions, extension), do: {:halt, parser}, else: {:cont, acc}
+      end)
+
+    parser =
+      if Keyword.has_key?(overrides, :parser) do
+        overrides[:parser]
+      else
+        parser
+      end
 
     if is_nil(parser) do
       {:error, "No parser for this file"}
     else
       case is_nil(sheet) do
         true ->
-          pids = parser.parse(path, parser_options)
+          pids = parser.parse(path)
 
           Enum.map(pids, fn
             {:ok, pid} -> {:ok, pid, parser}
@@ -61,7 +68,7 @@ defmodule Exoffice do
           end)
 
         false ->
-          result = parser.parse_sheet(path, sheet, parser_options)
+          result = parser.parse_sheet(path, sheet)
 
           case result do
             {:ok, pid} -> {:ok, pid, parser}
@@ -150,16 +157,5 @@ defmodule Exoffice do
   """
   def count_rows(pid, parser) do
     parser.count_rows(pid)
-  end
-
-  # Keep the compatibility with using the first parameter as sheet number
-  defp fix_options(n) when is_number(n), do: [sheet: n]
-  defp fix_options(nil), do: []
-  defp fix_options(ops), do: ops
-
-  defp find_parser(parsers, extension) do
-    Enum.reduce_while(parsers, nil, fn parser, acc ->
-      if Enum.member?(parser.extensions, extension), do: {:halt, parser}, else: {:cont, acc}
-    end)
   end
 end
